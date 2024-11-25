@@ -5,6 +5,7 @@
 .streamlit/secrets.toml
 secrets.toml
 
+*.png
 *.json
 *.csv
 *.parquet
