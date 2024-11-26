@@ -1,0 +1,9 @@
+pandas
+praw
+toml
+openai
+plotly
+numpy
+ipython
+tqdm
+jupyter 
