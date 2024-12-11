@@ -1,0 +1,40 @@
+# The use case description that guides all analysis
+use_case = """We are analyzing Reddit posts to understand how people are using AI and chatbots for mental health, coaching, or emotional support.
+Specifically, we want to identify posts where users share their personal experiences using AI tools for:
+- Managing mental health conditions (anxiety, depression, ADHD, OCD, PTSD, trauma, etc.)
+- Emotional support and wellbeing
+- Therapy supplements or alternatives
+- Wellness coaching and goal setting
+- Help focusing, goal setting, managing stress, overcoming obstacles, etc.
+- Other similar use cases for AI in mental health
+
+The post should include first-hand experience using AI tools, not just general discussion about AI in mental health.
+This does NOT need to be the main focus of the post, but it should clearly mention using AI for the use case described.
+We want to extract structured data about their experiences, including benefits, challenges, and specific use cases.
+Do NOT make stuff up. ONLY use keywords that accurately fit what the schema describes.
+A keyword that applies to the post generally but not specifically to what is asked for by the schema should not be used.
+"""
+
+[fields]
+relevant_sample = { type = "boolean", description = "Does post describe personal experience using AI for mental health?" }
+relevant_sample_explanation = { type = "string", description = "Why the post was classified as relevant or not" }
+sentiment = { type = "integer", description = "Sentiment towards AI for mental health (1-10, 10 most positive)" }
+benefits = { type = "array", items = { type = "string" }, description = "Keywords for benefits: non_judgemental, affordable, accessible, etc" }
+downsides = { type = "array", items = { type = "string" }, description = "Keywords for downsides: repetitive, shallow, unreliable, etc" }
+use_cases = { type = "array", items = { type = "string" }, description = "How AI is used: reflection, venting, CBT, journaling, etc" }
+conditions = { type = "array", items = { type = "string" }, description = "Conditions mentioned: ADHD, depression, anxiety, etc" }
+seeing_provider = { type = "boolean", description = "Currently seeing a mental health provider" }
+previous_provider = { type = "boolean", description = "Has previously seen a mental health provider" }
+provider_problems = { type = "array", items = { type = "string" }, description = "Issues with human providers: expensive, unavailable, etc" }
+analysis_notes = { type = "string", description = "Additional analysis and reasoning" }
+
+[[data_sources]]
+type = "reddit"
+query = "(AI OR chatbot OR GPT) AND (mental health OR therapy)"
+include_comments = false
+
+[[data_sources]]
+type = "reddit"
+query = "(AI OR chatbot OR GPT)"
+subreddits = ["ADHD", "anxiety"]
+include_comments = true

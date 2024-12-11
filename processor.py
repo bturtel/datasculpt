@@ -5,6 +5,8 @@ from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 
+FILTER_PROMPT = "Is this text relevant to the described use case? Answer 'Yes' or 'No' and explain briefly."
+
 class Processor:
     def __init__(
         self,

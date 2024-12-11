@@ -1,0 +1,25 @@
+# The use case description that guides all analysis
+use_case = """We are analyzing Reddit posts from subreddits like r/IVF, r/infertility, and r/IVFAfterSuccess to understand which interventions or protocols have led to improved IVF outcomes.
+Specifically, we want to find posts where users share their personal IVF attempts, especially cases where previous results were suboptimal (e.g., few eggs retrieved, poor embryo quality, failed implantation) and then they implemented a new protocol, regimen, supplement, medication, dietary change, or lifestyle practice that led to better outcomes (e.g., more eggs, higher-quality embryos, successful implantation).
+
+We want to extract before/after metrics (previous egg/embryo counts vs. new counts), identify the interventions mentioned (coq10, dhea, nr, nad, high_protein_diet, keto_diet, acupuncture, meditation, etc.), note any underlying conditions (e.g. PCOS, low_AMH, DOR, endometriosis), record sentiment towards the changes, and list any advice the user offers based on their successful attempt.
+Do NOT invent details. ONLY use what the user explicitly states. If specifics aren't given, leave them out."""
+
+[fields]
+relevant_sample = { type = "boolean", description = "True if the post describes a personal IVF scenario with changed protocol and reported outcomes." }
+relevant_sample_explanation = { type = "string", description = "Explanation of why the sample was classified as relevant or not." }
+baseline_eggs = { type = "integer", description = "Number of eggs retrieved before new interventions (if stated)." }
+baseline_embryos = { type = "integer", description = "Number of embryos/blastocysts before new interventions (if stated)." }
+new_eggs = { type = "integer", description = "Number of eggs retrieved after implementing the new protocol." }
+new_embryos = { type = "integer", description = "Number of embryos/blastocysts developed after the new protocol." }
+interventions = { type = "array", items = { type = "string" }, description = "List of interventions tried, e.g.: coq10, dhea, nr, nad, high_protein_diet, keto_diet, acupuncture, meditation." }
+conditions = { type = "array", items = { type = "string" }, description = "List of fertility-related conditions mentioned, e.g.: PCOS, low_AMH, DOR, endometriosis." }
+sentiment = { type = "integer", description = "1-10 indicating positivity towards the effectiveness of changes (10 = very positive)." }
+advice = { type = "array", items = { type = "string" }, description = "Any suggestions or advice the user gives based on their experience." }
+fields_explanation = { type = "string", description = "Explanation of reasoning for each extracted field (except relevant_sample and relevant_sample_explanation)." }
+
+[[data_sources]]
+type = "reddit"
+query = "IVF"
+include_comments = false
+subreddits = ["IVF", "infertility", "IVFAfterSuccess"]
