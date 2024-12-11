@@ -2,6 +2,8 @@ import pandas as pd
 import json
 from typing import Dict, Any
 from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor
+import numpy as np
 
 class Processor:
     def __init__(
@@ -12,18 +14,9 @@ class Processor:
         filter_llm_client,
         extract_llm_client,
         filter_model: str,
-        extract_model: str
+        extract_model: str,
+        max_workers: int = 5
     ):
-        """
-        Args:
-            use_case_description: Text describing the overall use case.
-            filter_prompt: Prompt to ask the filter LLM to determine if a sample is relevant.
-            extraction_schema: Schema of fields to extract from relevant samples.
-            filter_llm_client: An LLM client instance for filtering (e.g. cheaper model).
-            extract_llm_client: An LLM client instance for extraction (e.g. better model).
-            filter_model: Model name for filter LLM.
-            extract_model: Model name for extraction LLM.
-        """
         self.use_case_description = use_case_description
         self.filter_prompt = filter_prompt
         self.extraction_schema = extraction_schema
@@ -31,19 +24,49 @@ class Processor:
         self.extract_llm_client = extract_llm_client
         self.filter_model = filter_model
         self.extract_model = extract_model
+        self.max_workers = max_workers
+
+    def _build_filter_prompt(self, text: str, context: str) -> str:
+        if context.strip():
+            return f"""
+{self.use_case_description}
+
+You have a main TEXT and an optional CONTEXT. Focus ONLY on the TEXT for determining relevance.
+
+TEXT:
+{text}
+
+CONTEXT:
+{context}
+
+Question: {self.filter_prompt}
+Answer 'Yes' or 'No' and a brief explanation.
+"""
+        else:
+            return f"""
+{self.use_case_description}
+
+Analyze the following TEXT:
+{text}
+
+Question: {self.filter_prompt}
+Answer 'Yes' or 'No' and a brief explanation.
+"""
+
+    def _filter_single(self, args):
+        """Helper function to run a single filter LLM call."""
+        text, context = args
+        prompt = self._build_filter_prompt(text, context)
+        response = self.filter_llm_client.chat.completions.create(
+            model=self.filter_model,
+            messages=[{"role":"user","content":prompt}],
+            temperature=0
+        )
+        answer = response.choices[0].message.content.strip().lower()
+        relevant = answer.startswith('yes')
+        return relevant, answer
 
     def filter_data(self, df: pd.DataFrame, output_file: str = None) -> pd.DataFrame:
-        """
-        Filters data using the filter LLM.
-        
-        Args:
-            df: Input DataFrame.
-            output_file: If provided, writes the resulting DataFrame to this file (JSON).
-        
-        Returns:
-            A new DataFrame with 'is_relevant' and 'relevance_explanation' columns added.
-        """
-        # Work on a copy to avoid SettingWithCopyWarning
         df = df.copy()
         if df.empty:
             df["is_relevant"] = []
@@ -52,46 +75,15 @@ class Processor:
                 df.to_json(output_file, orient='records', date_format='iso')
             return df
 
-        is_relevant = []
-        explanations = []
-        
-        # Using tqdm for progress
-        for _, row in tqdm(df.iterrows(), total=len(df), desc="Filtering data"):
-            metadata = row['metadata']
-            is_comment = metadata.get('is_comment', False)
-            if is_comment:
-                prompt = f"""
-{self.use_case_description}
+        # Prepare input for parallel calls
+        inputs = [(row['text'], row['context_text']) for _, row in df.iterrows()]
 
-You are given a COMMENT and the ORIGINAL POST it responds to. The original post is context only.
-Focus ONLY on the COMMENT portion for determining relevance.
+        # Run in parallel
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            results = list(tqdm(executor.map(self._filter_single, inputs), total=len(inputs), desc="Filtering data"))
 
-COMMENT and Context:
-{row['combined_text']}
-
-Question: {self.filter_prompt}
-Answer 'Yes' or 'No' and a brief explanation.
-"""
-            else:
-                prompt = f"""
-{self.use_case_description}
-
-Analyze the following POST:
-{row['combined_text']}
-
-Question: {self.filter_prompt}
-Answer 'Yes' or 'No' and a brief explanation.
-"""
-
-            response = self.filter_llm_client.chat.completions.create(
-                model=self.filter_model,
-                messages=[{"role":"user","content":prompt}],
-                temperature=0
-            )
-            answer = response.choices[0].message.content.strip().lower()
-            relevant = answer.startswith('yes')
-            is_relevant.append(relevant)
-            explanations.append(answer)
+        is_relevant = [res[0] for res in results]
+        explanations = [res[1] for res in results]
 
         df["is_relevant"] = is_relevant
         df["relevance_explanation"] = explanations
@@ -101,38 +93,44 @@ Answer 'Yes' or 'No' and a brief explanation.
 
         return df
 
-    def extract_fields(self, df: pd.DataFrame, output_file: str = None) -> pd.DataFrame:
-        """
-        Extracts fields using the extraction LLM.
-        
-        Args:
-            df: DataFrame that has 'is_relevant' column (from filter step).
-            output_file: If provided, writes the resulting DataFrame to this file (JSON).
-        
-        Returns:
-            A new DataFrame with extracted fields added according to the schema.
-        """
-        # Work on a copy to avoid SettingWithCopyWarning
-        df = df.copy()
+    def _build_extraction_prompt(self, text: str, context: str) -> str:
+        schema_str = json.dumps(self.extraction_schema, indent=2)
+        if context.strip():
+            return f"""
+{self.use_case_description}
 
-        if df.empty:
-            # Add extraction fields as None
-            for f in self.extraction_schema.keys():
-                df[f] = None
-            if output_file:
-                df.to_json(output_file, orient='records', date_format='iso')
-            return df
+You have a main TEXT and a CONTEXT. Extract the requested fields from the TEXT only.
 
-        relevant_df = df[df["is_relevant"] == True]
+TEXT:
+{text}
 
-        if relevant_df.empty:
-            # No relevant samples, still add extraction fields as None
-            for f in self.extraction_schema.keys():
-                df[f] = None
-            if output_file:
-                df.to_json(output_file, orient='records', date_format='iso')
-            return df
+CONTEXT:
+{context}
 
+Extract fields as JSON according to the schema:
+{schema_str}
+
+Return only valid JSON:
+"""
+        else:
+            return f"""
+{self.use_case_description}
+
+Analyze the TEXT and extract requested fields.
+
+TEXT:
+{text}
+
+Extract fields as JSON according to the schema:
+{schema_str}
+
+Return only valid JSON:
+"""
+
+    def _extract_single(self, args):
+        """Helper function to run a single extraction LLM call."""
+        text, context = args
+        prompt = self._build_extraction_prompt(text, context)
         schema = {
             "name": "extract_fields",
             "strict": True,
@@ -144,62 +142,58 @@ Answer 'Yes' or 'No' and a brief explanation.
             }
         }
 
-        results = []
-        # Using tqdm for progress
-        for _, row in tqdm(relevant_df.iterrows(), total=len(relevant_df), desc="Extracting fields"):
-            metadata = row['metadata']
-            is_comment = metadata.get('is_comment', False)
-            if is_comment:
-                extraction_prompt = f"""
-{self.use_case_description}
+        response = self.extract_llm_client.chat.completions.create(
+            model=self.extract_model,
+            messages=[
+                {"role":"system","content":self.use_case_description},
+                {"role":"user","content":prompt}
+            ],
+            response_format={
+                "type": "json_schema",
+                "json_schema": schema
+            },
+            temperature=0
+        )
+        content = response.choices[0].message.content.strip()
+        try:
+            data = json.loads(content)
+        except:
+            data = {k: None for k in self.extraction_schema.keys()}
+        return data
 
-You are given a COMMENT and the ORIGINAL POST it responds to. The original post is context only.
-Focus ONLY on the COMMENT portion for extracting the fields.
+    def extract_fields(self, df: pd.DataFrame, output_file: str = None) -> pd.DataFrame:
+        df = df.copy()
+        if df.empty:
+            for f in self.extraction_schema.keys():
+                df[f] = None
+            if output_file:
+                df.to_json(output_file, orient='records', date_format='iso')
+            return df
 
-COMMENT and Context:
-{row['combined_text']}
+        relevant_df = df[df["is_relevant"] == True]
 
-Extract the requested fields as JSON according to this schema:
-{json.dumps(self.extraction_schema, indent=2)}
+        if relevant_df.empty:
+            for f in self.extraction_schema.keys():
+                df[f] = None
+            if output_file:
+                df.to_json(output_file, orient='records', date_format='iso')
+            return df
 
-Return only valid JSON:
-"""
-            else:
-                extraction_prompt = f"""
-{self.use_case_description}
+        # Prepare input for parallel calls
+        inputs = [(row['text'], row['context_text']) for _, row in relevant_df.iterrows()]
 
-Analyze the following POST:
-{row['combined_text']}
+        # Run extractions in parallel
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            results = list(tqdm(executor.map(self._extract_single, inputs), total=len(inputs), desc="Extracting fields"))
 
-Extract the requested fields as JSON according to this schema:
-{json.dumps(self.extraction_schema, indent=2)}
+        # Merge results back
+        # relevant_df and results correspond one-to-one in order
+        extracted_df = pd.DataFrame(results)
+        # Add id from relevant_df
+        extracted_df['id'] = relevant_df['id'].values
 
-Return only valid JSON:
-"""
-
-            response = self.extract_llm_client.chat.completions.create(
-                model=self.extract_model,
-                messages=[
-                    {"role":"system","content":self.use_case_description},
-                    {"role":"user","content":extraction_prompt}
-                ],
-                response_format={
-                    "type": "json_schema",
-                    "json_schema": schema
-                },
-                temperature=0
-            )
-            content = response.choices[0].message.content.strip()
-            try:
-                data = json.loads(content)
-            except:
-                data = {k: None for k in self.extraction_schema.keys()}
-            results.append((row['id'], data))
-
-        extracted_df = pd.DataFrame([{"id": rid, **res} for rid, res in results])
         df = pd.merge(df, extracted_df, on="id", how="left")
 
-        # For posts not relevant, ensure fields exist as None
         for f in self.extraction_schema.keys():
             if f not in df.columns:
                 df[f] = None
