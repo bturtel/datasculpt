@@ -1,9 +1,4 @@
-# The use case description that guides all analysis
-use_case = """We are analyzing Reddit posts from subreddits like r/IVF, r/infertility, and r/IVFAfterSuccess to understand which interventions or protocols have led to improved IVF outcomes.
-Specifically, we want to find posts where users share their personal IVF attempts, especially cases where previous results were suboptimal (e.g., few eggs retrieved, poor embryo quality, failed implantation) and then they implemented a new protocol, regimen, supplement, medication, dietary change, or lifestyle practice that led to better outcomes (e.g., more eggs, higher-quality embryos, successful implantation).
-
-We want to extract before/after metrics (previous egg/embryo counts vs. new counts), identify the interventions mentioned (coq10, dhea, nr, nad, high_protein_diet, keto_diet, acupuncture, meditation, etc.), note any underlying conditions (e.g. PCOS, low_AMH, DOR, endometriosis), record sentiment towards the changes, and list any advice the user offers based on their successful attempt.
-Do NOT invent details. ONLY use what the user explicitly states. If specifics aren't given, leave them out."""
+use_case = "We are analyzing Reddit posts from subreddits like r/IVF, r/infertility, and r/IVFAfterSuccess to understand which interventions or protocols have led to improved IVF outcomes. Specifically, we want to find posts where users share their personal IVF attempts, especially cases where previous results were suboptimal and then they implemented a new protocol (only single-word, underscore-separated keywords), supplement, medication, dietary change, or lifestyle practice that led to better outcomes. We want to extract before/after metrics (previous egg/embryo counts vs. new counts), identify conditions, and categorize interventions into four categories: medications, supplements, lifestyle_changes, and diet. All interventions must be a single keyword with underscores (e.g. coq10, dhea, nr, nad, high_protein_diet, keto_diet, acupuncture, meditation). If both baseline and new counts are known, compute percent_change_eggs and percent_change_embryos as ((new - baseline)/baseline)*100. Do NOT invent details. ONLY use what the user explicitly states. If specifics aren't given, leave them out."
 
 [fields]
 relevant_sample = { type = "boolean", description = "True if the post describes a personal IVF scenario with changed protocol and reported outcomes." }
@@ -12,10 +7,20 @@ baseline_eggs = { type = "integer", description = "Number of eggs retrieved befo
 baseline_embryos = { type = "integer", description = "Number of embryos/blastocysts before new interventions (if stated)." }
 new_eggs = { type = "integer", description = "Number of eggs retrieved after implementing the new protocol." }
 new_embryos = { type = "integer", description = "Number of embryos/blastocysts developed after the new protocol." }
-interventions = { type = "array", items = { type = "string" }, description = "List of interventions tried, e.g.: coq10, dhea, nr, nad, high_protein_diet, keto_diet, acupuncture, meditation." }
-conditions = { type = "array", items = { type = "string" }, description = "List of fertility-related conditions mentioned, e.g.: PCOS, low_AMH, DOR, endometriosis." }
-sentiment = { type = "integer", description = "1-10 indicating positivity towards the effectiveness of changes (10 = very positive)." }
-advice = { type = "array", items = { type = "string" }, description = "Any suggestions or advice the user gives based on their experience." }
+percent_change_eggs = { type = "integer", description = "Percent change in eggs ((new_eggs - baseline_eggs)/baseline_eggs)*100 if both are known." }
+percent_change_embryos = { type = "integer", description = "Percent change in embryos ((new_embryos - baseline_embryos)/baseline_embryos)*100 if both are known." }
+
+medications = { type = "array", items = { type = "string" }, description = "Medications (single keyword underscores only). Examples: estrace, omnitrope, menopur, gonalf, lupron, hgh, follistim, progesterone_in_oil, cetrotide, bravelle." }
+
+supplements = { type = "array", items = { type = "string" }, description = "Supplements (single keyword underscores only). Examples: coq10, dhea, vitamin_d, prenatal, folate, myoinositol, melatonin, ubiquinol, l_arginine, maca." }
+
+lifestyle_changes = { type = "array", items = { type = "string" }, description = "Lifestyle changes (single keyword underscores only). Examples: acupuncture, meditation, better_sleep, stress_reduction, yoga, walking, journaling, no_alcohol, no_smoking, therapy." }
+
+diet = { type = "array", items = { type = "string" }, description = "Diet changes (single keyword underscores only). Examples: high_protein_diet, keto_diet, no_caffeine, low_carb, gluten_free, dairy_free, mediterranean, vegan, low_gi, sugar_free." }
+
+conditions = { type = "array", items = { type = "string" }, description = "Fertility-related conditions (single keyword underscores only). Examples: PCOS, low_AMH, DOR, endometriosis." }
+
+sentiment = { type = "integer", description = "1-10 indicating positivity towards changes (10 = very positive)." }
 fields_explanation = { type = "string", description = "Explanation of reasoning for each extracted field (except relevant_sample and relevant_sample_explanation)." }
 
 [[data_sources]]

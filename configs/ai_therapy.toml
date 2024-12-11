@@ -23,8 +23,8 @@ benefits = { type = "array", items = { type = "string" }, description = "Keyword
 downsides = { type = "array", items = { type = "string" }, description = "Keywords for downsides: repetitive, shallow, unreliable, etc" }
 use_cases = { type = "array", items = { type = "string" }, description = "How AI is used: reflection, venting, CBT, journaling, etc" }
 conditions = { type = "array", items = { type = "string" }, description = "Conditions mentioned: ADHD, depression, anxiety, etc" }
-seeing_provider = { type = "boolean", description = "Currently seeing a mental health provider" }
-previous_provider = { type = "boolean", description = "Has previously seen a mental health provider" }
+seeing_provider = { type = "boolean", description = "Currently seeing a mental health provider (True or False)" }
+previous_provider = { type = "boolean", description = "Has previously seen a mental health provider (True or False)" }
 provider_problems = { type = "array", items = { type = "string" }, description = "Issues with human providers: expensive, unavailable, etc" }
 analysis_notes = { type = "string", description = "Additional analysis and reasoning" }
 
@@ -37,4 +37,4 @@ include_comments = false
 type = "reddit"
 query = "(AI OR chatbot OR GPT)"
 subreddits = ["ADHD", "anxiety"]
-include_comments = true
+include_comments = false

@@ -17,7 +17,7 @@ class Processor:
         extract_llm_client,
         filter_model: str,
         extract_model: str,
-        max_workers: int = 5
+        max_workers: int = 4
     ):
         self.use_case_description = use_case_description
         self.filter_prompt = filter_prompt
