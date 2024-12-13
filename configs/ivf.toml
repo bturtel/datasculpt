@@ -26,5 +26,5 @@ fields_explanation = { type = "string", description = "Explanation of reasoning 
 [[data_sources]]
 type = "reddit"
 query = "IVF"
-include_comments = True
+include_comments = true
 subreddits = ["IVF", "infertility", "IVFAfterSuccess"]
