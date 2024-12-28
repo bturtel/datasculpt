@@ -1,0 +1,19 @@
+use_case = """We are analyzing recent trends in HackerNews discussions about AI. We want to see which AI models people are talking about, the ways they’re using them (e.g., coding, data analysis, creative writing), the prompting or fine-tuning methods mentioned, and how they’re hosting or deploying these models (e.g., through an API, self-host, open-source). We're also interested in new techniques or explorations. Finally, we want to gather any other relevant commentary or observations about AI adoption, challenges, or community reception."""
+
+[fields]
+relevant_sample = { type = "boolean", description = "Is this post relevant to the use case described?" }
+relevant_sample_explanation = { type = "string", description = "Why the post was classified as relevant or not" }
+models_mentioned = { type = "array", items = { type = "string" }, description = "Normalized references: gpt_3_5, gpt_4, llama_2, falcon, wizardlm, bloom, mpt, llama_3, etc." }
+model_source = { type = "array", items = { type = "string" }, description = "Where the model originates: openai, meta, huggingface, independent, anthropic, etc." }
+use_cases = { type = "array", items = { type = "string" }, description = "Which use cases? coding, data_analysis, creative_writing, chatbot, etc." }
+prompting_methods = { type = "array", items = { type = "string" }, description = "Examples: few_shot, chain_of_thought, fine_tuning, peft, qlora." }
+model_hosting = { type = "array", items = { type = "string" }, description = "Where is it hosted? api, self_host, open_source, local, etc." }
+new_methods_explored = { type = "array", items = { type = "string" }, description = "Any new or novel approaches: retrieval_augmentation, agentic_workflow, distributed_training, etc." }
+keywords = { type = "array", items = { type = "string" }, description = "Any keywords that are relevant to the use case not captured by the other fields" }
+
+[[data_sources]]
+type = "hackernews"
+query = "AI"
+include_comments = false
+limit = 1000
+tags = ["show_hn"]

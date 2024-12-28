@@ -1,6 +1,7 @@
 import pandas as pd
 import toml
 import praw
+import requests
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
 
@@ -12,16 +13,8 @@ class BaseDataSource(ABC):
         """
         Returns a DataFrame with at least:
           - id (str)
-          - title (str)
           - text (str)
-          - context_text (str)
           - url (str)
-          - subreddit (str)
-          - score (float or int)
-          - created_utc (datetime64[ns]) after conversion
-          - is_comment (bool)
-          - comment_id (str or None)
-          - num_comments (int or None)
         """
         pass
 
@@ -145,5 +138,147 @@ class RedditDataSource(BaseDataSource):
             # Only convert if not already datetime
             if pd.api.types.is_numeric_dtype(df['created_utc']):
                 df['created_utc'] = pd.to_datetime(df['created_utc'], unit='s', errors='coerce')
+
+        return df
+
+
+class HackerNewsDataSource(BaseDataSource):
+    def __init__(
+        self,
+        query: str,
+        include_comments: bool = False,
+        limit: Optional[int] = None,
+        tags: Optional[List[str]] = None
+    ):
+        """
+        :param query: Search query string (e.g. 'AI', 'ChatGPT', etc.)
+        :param include_comments: Whether to fetch comments as separate records
+        :param limit: Max number of items to return
+        :param tags: Additional tags for Algolia HN search (e.g., ['story', 'comment'])
+        """
+        self.query = query
+        self.include_comments = include_comments
+        self.limit = limit
+        # By default, search only 'story' if not provided
+        self.tags = tags if tags else ["story"]
+
+    def _build_hn_api_url(self, page: int) -> str:
+        base_url = "https://hn.algolia.com/api/v1/search"
+        # If you want to search comments separately, you can specify tags=comment below. 
+        # For now we only search stories here:
+        tags_param = ",".join(self.tags)
+        return f"{base_url}?query={self.query}&tags={tags_param}&hitsPerPage=100&page={page}"
+
+    def _fetch_stories(self) -> List[Dict[str, Any]]:
+        stories = []
+        total_fetched = 0
+        page = 0
+
+        while True:
+            url = self._build_hn_api_url(page)
+            resp = requests.get(url)
+            if resp.status_code != 200:
+                break
+
+            data = resp.json()
+            hits = data.get("hits", [])
+            if not hits:
+                break
+
+            for h in hits:
+                stories.append(h)
+                total_fetched += 1
+                if self.limit is not None and total_fetched >= self.limit:
+                    break
+
+            if self.limit is not None and total_fetched >= self.limit:
+                break
+
+            page += 1  # move to next page
+
+        return stories
+
+    def _fetch_comments_for_story(self, story_id: str) -> List[Dict[str, Any]]:
+        # Example usage: fetch comments for a story (this is a separate call)
+        base_url = "https://hn.algolia.com/api/v1/search"
+        url = f"{base_url}?tags=comment,story_{story_id}&hitsPerPage=100"
+        all_comments = []
+        page = 0
+
+        while True:
+            resp = requests.get(f"{url}&page={page}")
+            if resp.status_code != 200:
+                break
+
+            data = resp.json()
+            hits = data.get("hits", [])
+            if not hits:
+                break
+
+            all_comments.extend(hits)
+            if len(hits) < 100:
+                break
+            page += 1
+
+        return all_comments
+
+    def get_data(self) -> pd.DataFrame:
+        stories = self._fetch_stories()
+        rows = []
+
+        for s in stories:
+            # Basic fields
+            id_str = str(s.get("objectID", ""))
+            title = s.get("title", "")
+            text = s.get("story_text", "") or s.get("comment_text", "")
+            url = s.get("url", f"https://news.ycombinator.com/item?id={id_str}")
+            score = s.get("points", None)
+            created_utc = s.get("created_at_i", None)
+            author = s.get("author", "")
+
+            rows.append({
+                "id": f"{id_str}_story",
+                "title": title,
+                "text": text,
+                "context_text": "",
+                "url": url,
+                "subreddit": None,  # not applicable to HN
+                "score": score,
+                "created_utc": created_utc,
+                "is_comment": False,
+                "comment_id": None,
+                "num_comments": s.get("num_comments", None),
+                "author": author
+            })
+
+            # Optionally fetch comments for each story
+            if self.include_comments:
+                all_comments = self._fetch_comments_for_story(id_str)
+                for c in all_comments:
+                    comment_id = str(c.get("objectID", ""))
+                    comment_text = c.get("comment_text", "")
+                    comment_author = c.get("author", "")
+                    comment_created_utc = c.get("created_at_i", None)
+                    score_c = c.get("points", None)
+
+                    context_str = f"Story Title: {title}\nStory URL: {url}"
+                    rows.append({
+                        "id": f"{id_str}_comment_{comment_id}",
+                        "title": "[Comment] " + title,
+                        "text": comment_text,
+                        "context_text": context_str,
+                        "url": f"https://news.ycombinator.com/item?id={comment_id}",
+                        "subreddit": None,
+                        "score": score_c,
+                        "created_utc": comment_created_utc,
+                        "is_comment": True,
+                        "comment_id": comment_id,
+                        "num_comments": None,
+                        "author": comment_author
+                    })
+
+        df = pd.DataFrame(rows).drop_duplicates(subset="id", keep="first").reset_index(drop=True)
+        if not df.empty and pd.api.types.is_numeric_dtype(df["created_utc"]):
+            df["created_utc"] = pd.to_datetime(df["created_utc"], unit="s", errors="coerce")
 
         return df
