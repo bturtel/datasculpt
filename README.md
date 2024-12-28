@@ -1,6 +1,8 @@
 # AI-Powered Reddit Research Analysis Tool
 
-A tool that leverages artificial intelligence to conduct systematic research studies using Reddit data. This tool automates the process of collecting, analyzing, and quantifying Reddit posts and comments to extract meaningful insights and patterns.
+A tool that leverages artificial intelligence to conduct systematic research studies using Reddit data. This tool automates the process of collecting, analyzing, and quantifying Reddit posts and comments to extract meaningful insights and patterns. 
+
+[See an example analysis of AI therapy discussions on Reddit](https://www.pensiveapp.com/reports/ai-therapy-reddit-analysis).
 
 ## Overview
 
@@ -11,4 +13,4 @@ This tool enables researchers to:
 4. Conduct quantitative analysis to measure trends and patterns
 5. Generate publication-ready visualizations and research summaries
 
-Perfect for researchers studying social media trends, user behaviors, and emerging technologies through the lens of Reddit communities.
+Useful for studying social media trends, user behaviors, and emerging technologies through the lens of Reddit communities.

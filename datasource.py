@@ -12,16 +12,8 @@ class BaseDataSource(ABC):
         """
         Returns a DataFrame with at least:
           - id (str)
-          - title (str)
           - text (str)
-          - context_text (str)
           - url (str)
-          - subreddit (str)
-          - score (float or int)
-          - created_utc (datetime64[ns]) after conversion
-          - is_comment (bool)
-          - comment_id (str or None)
-          - num_comments (int or None)
         """
         pass
 
