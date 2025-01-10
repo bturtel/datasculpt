@@ -3,17 +3,36 @@ import praw
 import requests
 import pandas as pd
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
 
 class BaseDataSource(ABC):
     """
     Returns a DataFrame with zero or more arbitrary columns.
     No required fields.
     """
+    _registry: Dict[str, Type['BaseDataSource']] = {}
+    
+    @classmethod
+    def register(cls, name: str):
+        """Class decorator to register data sources"""
+        def wrapper(wrapped_class):
+            cls._registry[name] = wrapped_class
+            return wrapped_class
+        return wrapper
+    
+    @classmethod
+    def get_source_class(cls, name: str) -> Type['BaseDataSource']:
+        """Get a data source class by its registered name."""
+        if name not in cls._registry:
+            available = list(cls._registry.keys())
+            raise ValueError(f"Unknown data source type: {name}. Available types: {available}")
+        return cls._registry[name]
+    
     @abstractmethod
     def get_data(self) -> pd.DataFrame:
         pass
 
+@BaseDataSource.register("csv")
 class CSVDataSource(BaseDataSource):
     """
     Reads any CSV. No required columns.
@@ -26,6 +45,7 @@ class CSVDataSource(BaseDataSource):
         df = df.drop_duplicates().reset_index(drop=True)
         return df
 
+@BaseDataSource.register("list")
 class ListDataSource(BaseDataSource):
     """
     Accepts a list of dicts with any keys.
@@ -40,11 +60,15 @@ class ListDataSource(BaseDataSource):
         df = df.drop_duplicates().reset_index(drop=True)
         return df
 
+@BaseDataSource.register("reddit")
 class RedditDataSource(BaseDataSource):
     """
     Example Reddit DataSource. 
     """
-    def __init__(self, query: str, reddit_client: praw.Reddit,
+    def __init__(self, query: str,
+                 client_id: str,
+                 client_secret: str, 
+                 user_agent: str,
                  include_comments: bool = False,
                  limit: Optional[int] = None,
                  subreddits: Optional[List[str]] = None,
@@ -53,9 +77,13 @@ class RedditDataSource(BaseDataSource):
         self.include_comments = include_comments
         self.limit = limit
         self.subreddits = subreddits or ["all"]
-        self.reddit = reddit_client
         self.sort = sort
         self.time_filter = time_filter
+        self.reddit = praw.Reddit(
+            client_id=client_id,
+            client_secret=client_secret,
+            user_agent=user_agent
+        )
 
     def get_data(self) -> pd.DataFrame:
         rows, total = [], 0
@@ -106,6 +134,7 @@ class RedditDataSource(BaseDataSource):
                 df["created_utc"] = pd.to_datetime(df["created_utc"], unit="s", errors="coerce")
         return df.reset_index(drop=True)
 
+@BaseDataSource.register("hackernews")
 class HackerNewsDataSource(BaseDataSource):
     """
     Example HackerNews DataSource.

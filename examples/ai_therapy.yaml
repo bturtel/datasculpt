@@ -3,6 +3,31 @@ vars:
   openai_key: &openai_key "${OPENAI_API_KEY}"
   deepinfra_base: &deepinfra_base "https://api.deepinfra.com/v1/openai"
   deepinfra_key: &deepinfra_key "${DEEPINFRA_API_KEY}"
+  reddit_client_id: &reddit_client_id "${REDDIT_CLIENT_ID}"
+  reddit_client_secret: &reddit_client_secret "${REDDIT_CLIENT_SECRET}"
+  reddit_user_agent: &reddit_user_agent "${REDDIT_USER_AGENT}"
+
+input:
+  - type: "reddit"
+    config:
+      query: "(AI OR chatbot OR GPT) AND (mental health OR therapy)"
+      include_comments: false
+      limit: 10
+      client_id: *reddit_client_id
+      client_secret: *reddit_client_secret
+      user_agent: *reddit_user_agent
+  - type: "reddit"
+    config:
+      query: "(AI OR chatbot OR GPT)"
+      subreddits: ["ADHD", "anxiety"]
+      include_comments: false
+      limit: 10
+      client_id: *reddit_client_id
+      client_secret: *reddit_client_secret
+      user_agent: *reddit_user_agent
+
+output:
+  path: "examples/output/ai_therapy_out.csv"
 
 steps:
   - sculptor:

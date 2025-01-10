@@ -152,6 +152,9 @@ class Sculptor:
             if isinstance(field_type, type):
                 field_type = [k for k, v in ALLOWED_TYPES.items() if v == field_type][0]
 
+            # Add null type for numeric fields to avoid defaulting to 0
+            needs_null = field_type in ["number", "integer"]
+
             if field_type == "array":
                 item_type = meta["items"]
                 if isinstance(item_type, type):
@@ -165,7 +168,9 @@ class Sculptor:
             elif field_type == "anyOf":
                 properties[field_name] = {"anyOf": meta["anyOf"]}
             else:
-                properties[field_name] = {"type": field_type}
+                properties[field_name] = {
+                    "type": [field_type, "null"] if needs_null else field_type
+                }
 
         return {
             "name": "extract_fields",
@@ -216,11 +221,14 @@ class Sculptor:
                 response_format={"type": "json_schema", "json_schema": schema_for_llm},
                 temperature=0,
             )
-            # print("LLM_INPUT", self._build_user_message(data, schema_for_llm))
             content = resp.choices[0].message.content.strip()
             extracted = json.loads(content)
             if isinstance(extracted, list) and len(extracted) == 1:
                 extracted = extracted[0]  # Some models wrap the output in a list
+            
+            # Clean up any whitespace in keys
+            extracted = {k.strip(): v for k, v in extracted.items()}
+            
         except Exception as e:
             raise RuntimeError(f"LLM API call failed: {e}")
 
