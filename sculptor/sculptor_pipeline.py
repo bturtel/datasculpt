@@ -58,6 +58,13 @@ class SculptorPipeline:
             
         return pipeline
 
+    def get_schema_fields(self) -> Dict[str, Dict[str, Any]]:
+        """Gets a combined dictionary of all schema fields from all sculptors in the pipeline."""
+        schema_fields = {}
+        for sculptor, _ in self.steps:
+            schema_fields.update(sculptor.schema)
+        return schema_fields
+
     def process(
         self,
         data: List[Dict[str, Any]],
