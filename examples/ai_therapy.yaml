@@ -1,0 +1,108 @@
+vars:
+  openai_base: &openai_base "https://api.openai.com/v1"
+  openai_key: &openai_key "${OPENAI_API_KEY}"
+  deepinfra_base: &deepinfra_base "https://api.deepinfra.com/v1/openai"
+  deepinfra_key: &deepinfra_key "${DEEPINFRA_API_KEY}"
+
+steps:
+  - sculptor:
+      model: "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+      api_key: *deepinfra_key
+      base_url: *deepinfra_base
+      schema:
+        relevant_sample:
+          type: boolean
+          description: "Does post describe personal experience using AI for mental health?"
+        relevant_sample_explanation:
+          type: string
+          description: "Why the post was classified as relevant or not"
+      instructions: >
+        We are analyzing Reddit posts to understand how people are using AI and chatbots for mental health, coaching, or emotional support.
+        Specifically, we want to identify posts where users share their personal experiences using AI tools for:
+          - Managing mental health conditions (anxiety, depression, ADHD, OCD, PTSD, trauma, etc.)
+          - Emotional support and wellbeing
+          - Therapy supplements or alternatives
+          - Wellness coaching and goal setting
+          - Help focusing, managing stress, or overcoming obstacles
+          - Other similar use cases involving AI in mental health
+
+        The post should include first-hand experience using AI tools, not just general discussion about AI in mental health.
+        This does NOT need to be the main focus of the post, but it should clearly mention using AI for the use case described.
+
+        You have a main TEXT and possibly a CONTEXT. Focus ONLY on the TEXT when deciding relevance.
+
+        If the post includes a clear, first-hand experience of using AI or chatbots for mental health, support, coaching, or similar, set relevant_sample to True. Otherwise, set it to False.
+
+        Provide a short explanation in relevant_sample_explanation describing your reasoning, especially whether or not the user explicitly describes a personal experience.
+      system_prompt: >
+        You are an AI filtering Reddit posts to determine whether they share genuine, first-hand experiences of using AI for mental health, coaching, or emotional support. Respond in valid JSON, setting relevant_sample to True or False, and give a concise relevant_sample_explanation.
+    filter: "lambda x: x['relevant_sample'] == True"
+    template: "Reddit Post: {text} \n\n Context: {context}"
+
+
+  - sculptor:
+      model: "meta-llama/Meta-Llama-3.1-405B-Instruct"
+      api_key: *deepinfra_key
+      base_url: *deepinfra_base
+      schema:
+        sentiment:
+          type: integer
+          description: "Sentiment towards AI for mental health (1-10, 10 most positive)"
+        benefits:
+          type: array
+          items: string
+          description: "Keywords for benefits: non_judgemental, affordable, accessible, etc"
+        downsides:
+          type: array
+          items: string
+          description: "Keywords for downsides: repetitive, shallow, unreliable, etc"
+        use_cases:
+          type: array
+          items: string
+          description: "How AI is used: reflection, venting, CBT, journaling, etc"
+        conditions:
+          type: array
+          items: string
+          description: "Conditions mentioned: ADHD, depression, anxiety, etc"
+        seeing_provider:
+          type: boolean
+          description: "Currently seeing a mental health provider (True or False)"
+        previous_provider:
+          type: boolean
+          description: "Has previously seen a mental health provider (True or False)"
+        provider_problems:
+          type: array
+          items: string
+          description: "Issues with human providers: expensive, unavailable, etc"
+        analysis_notes:
+          type: string
+          description: "Additional analysis and reasoning"
+      instructions: >
+        We are analyzing Reddit posts to understand how people are using AI and chatbots for mental health, coaching, or emotional support.
+        Specifically, we want to identify posts where users share their personal experiences using AI tools for:
+        - Managing mental health conditions (anxiety, depression, ADHD, OCD, PTSD, trauma, etc.)
+        - Emotional support and wellbeing
+        - Therapy supplements or alternatives
+        - Wellness coaching and goal setting
+        - Help focusing, goal setting, managing stress, overcoming obstacles, etc.
+        - Other similar use cases for AI in mental health
+
+        The post should include first-hand experience using AI tools, not just general discussion about AI in mental health.
+        This does NOT need to be the main focus of the post, but it should clearly mention using AI for the use case described.
+        We want to extract structured data about their experiences, including benefits, challenges, and specific use cases.
+        Do NOT make stuff up. ONLY use keywords that accurately fit what the schema describes.
+        Follow the examples from the schema - in most cases we want to extract STANDARDIZED, CONCISE KEYWORDS that can be quantified.  Stick to the examples or something very similar whenever possible.
+        A keyword that applies to the post generally but not specifically to what is asked for by the schema should not be used.
+
+        From the TEXT (and optional CONTEXT), extract:
+          - overall sentiment (scale 1-10),
+          - benefits and downsides,
+          - specific use cases (venting, journaling, CBT, etc.),
+          - any mentioned conditions (ADHD, anxiety, etc.),
+          - provider status (currently seeing one, or has previously),
+          - issues with human providers,
+          - and a concise analysis_notes.
+
+        Return valid JSON conforming to the schema. Do NOT invent details beyond what the TEXT states explicitly.
+      system_prompt: >
+        You are an AI analyzing posts to extract structured information about firsthand AI mental health usage. Follow the schema exactly, returning only valid JSON with the fields specified, avoiding any unsupported fields or speculation.
