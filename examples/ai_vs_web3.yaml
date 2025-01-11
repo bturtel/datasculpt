@@ -5,8 +5,8 @@ vars:
 input:
   - type: "hackernews"
     config:
-      query: "Show HN: "
-      limit: 50
+      tags: ["show_hn"]
+      limit: 10000
 
 output:
   path: "examples/output/launches.csv"
@@ -33,17 +33,15 @@ steps:
           description: "Name of the product being launched"
         category:
           type: array
-          items:
-            type: enum
-            enum: ["AI", "web3", "crypto", "blockchain", "creators", "NFT", "metaverse", 
+          items: "enum"
+          enum: ["AI", "web3", "crypto", "blockchain", "creators", "NFT", "metaverse", 
                   "VR", "quantum_computing", "edge", "IoT", "smart_home", "biotech", 
                   "space_tech", "clean_tech", "robotics", "dev_tools", "cloud", "fintech", "other"]
           description: "All categories that apply to this product (select multiple if relevant)"
         target_users:
           type: array
-          items:
-            type: enum
-            enum: ["developers", "enterprises", "consumers", "creators", "researchers"]
+          items: "enum"
+          enum: ["developers", "enterprises", "consumers", "creators", "researchers"]
           description: "Target audience(s)"
         pricing_tier:
           type: integer

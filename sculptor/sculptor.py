@@ -148,7 +148,7 @@ class Sculptor:
         properties = {}
         for field_name, meta in self.schema.items():
             field_type = meta["type"]
-            
+
             if isinstance(field_type, type):
                 field_type = [k for k, v in ALLOWED_TYPES.items() if v == field_type][0]
 
@@ -159,10 +159,17 @@ class Sculptor:
                 item_type = meta["items"]
                 if isinstance(item_type, type):
                     item_type = [k for k, v in ALLOWED_TYPES.items() if v == item_type][0]
-                properties[field_name] = {
-                    "type": "array",
-                    "items": {"type": item_type},
-                }
+
+                if item_type == "enum":
+                    properties[field_name] = {
+                        "type": "array",
+                        "items": {"type": "string", "enum": meta["enum"]},
+                    }
+                else:
+                    properties[field_name] = {
+                        "type": "array",
+                        "items": {"type": item_type},
+                    }
             elif field_type == "enum":
                 properties[field_name] = {"type": "string", "enum": meta["enum"]}
             elif field_type == "anyOf":
@@ -221,6 +228,7 @@ class Sculptor:
                 response_format={"type": "json_schema", "json_schema": schema_for_llm},
                 temperature=0,
             )
+            # print("LLM_INPUT", self._build_user_message(data, schema_for_llm))
             content = resp.choices[0].message.content.strip()
             extracted = json.loads(content)
             if isinstance(extracted, list) and len(extracted) == 1:
@@ -288,5 +296,3 @@ class Sculptor:
                 results.append(sculpt_with_merge(item))
 
         return results
-    
-    
