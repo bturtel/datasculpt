@@ -1,8 +1,10 @@
 # sculptor/helpers/data_sources.py
+import pandas as pd
 import praw
 import requests
-import pandas as pd
+import time
 from abc import ABC, abstractmethod
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Type
 
 class BaseDataSource(ABC):
@@ -137,60 +139,87 @@ class RedditDataSource(BaseDataSource):
 @BaseDataSource.register("hackernews")
 class HackerNewsDataSource(BaseDataSource):
     """
-    Example HackerNews DataSource.
-    No required fields; we produce whatever columns we choose.
+    A simple and clean HackerNews DataSource with flexible filtering.
     """
-    def __init__(self, query: str, include_comments: bool = False,
-                 limit: Optional[int] = None, tags: Optional[List[str]] = None):
+    def __init__(self, query: str = "", tags: Optional[List[str]] = None,
+                 include_comments: bool = False, limit: Optional[int] = None,
+                 min_created_at: Optional[datetime] = None):
+        """
+        Initializes the HackerNewsDataSource.
+
+        Args:
+            query: The search query (optional).
+            tags: A list of tags to filter by (e.g., ["story", "show_hn"]). Defaults to ["story"].
+            include_comments: Whether to fetch comments for stories (optional).
+            limit: The maximum number of items to fetch (optional).
+            min_created_at:  Fetch items created after this datetime (optional).
+        """
         self.query = query
+        self.tags = tags if tags is not None else ["story"]
         self.include_comments = include_comments
         self.limit = limit
-        self.tags = tags or ["story"]
+        self.min_created_at = min_created_at
 
     def _build_url(self, page: int) -> str:
         base = "https://hn.algolia.com/api/v1/search"
-        return f"{base}?query={self.query}&tags={','.join(self.tags)}&hitsPerPage=100&page={page}"
+        params = {
+            "query": self.query,
+            "tags": ",".join(self.tags),
+            "hitsPerPage": 1000,
+            "page": page,
+        }
+        if self.min_created_at:
+            timestamp = int(self.min_created_at.timestamp())
+            params["numericFilters"] = f"created_at_i>{timestamp}"
+        return f"{base}?{'&'.join([f'{k}={v}' for k, v in params.items() if v])}"
 
     def _fetch_stories(self) -> List[Dict[str, Any]]:
         out, total, page = [], 0, 0
         while True:
-            r = requests.get(self._build_url(page))
-            if r.status_code != 200:
-                break
-            data = r.json()
-            hits = data.get("hits", [])
-            if not hits:
-                break
-            for h in hits:
-                out.append(h)
-                total += 1
-                if self.limit and total >= self.limit:
+            url = self._build_url(page)
+            try:
+                r = requests.get(url)
+                r.raise_for_status()
+                data = r.json()
+                hits = data.get("hits", [])
+                if not hits:
                     break
-            if self.limit and total >= self.limit:
+                for h in hits:
+                    out.append(h)
+                    total += 1
+                    if self.limit and total >= self.limit:
+                        return out
+                page += 1
+                time.sleep(0.1)
+            except requests.exceptions.RequestException as e:
+                print(f"Error fetching page {page}: {e}")
                 break
-            page += 1
         return out
 
     def _fetch_comments(self, sid: str) -> List[Dict[str, Any]]:
         url = f"https://hn.algolia.com/api/v1/search?tags=comment,story_{sid}&hitsPerPage=100"
         out, page = [], 0
         while True:
-            r = requests.get(f"{url}&page={page}")
-            if r.status_code != 200:
+            try:
+                r = requests.get(f"{url}&page={page}")
+                r.raise_for_status()
+                data = r.json()
+                hits = data.get("hits", [])
+                if not hits:
+                    break
+                out.extend(hits)
+                if len(hits) < 100:
+                    break
+                page += 1
+                time.sleep(0.1)
+            except requests.exceptions.RequestException as e:
+                print(f"Error fetching comments for story {sid}: {e}")
                 break
-            d = r.json()
-            hits = d.get("hits", [])
-            if not hits:
-                break
-            out.extend(hits)
-            if len(hits) < 100:
-                break
-            page += 1
         return out
 
     def get_data(self) -> pd.DataFrame:
         stories = self._fetch_stories()
-        rows, total = [], 0
+        rows = []
         for s in stories:
             sid = str(s.get("objectID", ""))
             title = s.get("title", "")
@@ -207,7 +236,6 @@ class HackerNewsDataSource(BaseDataSource):
                 "is_comment": False,
                 "comment_id": None
             })
-            total += 1
             if self.include_comments:
                 c_list = self._fetch_comments(sid)
                 for c in c_list:
@@ -224,11 +252,9 @@ class HackerNewsDataSource(BaseDataSource):
                         "is_comment": True,
                         "comment_id": cid
                     })
-                    total += 1
-                    if self.limit and total >= self.limit:
-                        break
-            if self.limit and total >= self.limit:
-                break
+            if self.limit and len(rows) >= self.limit:
+                break  # Ensure limit is respected even with comments
+
         df = pd.DataFrame(rows)
         if not df.empty:
             df.drop_duplicates(inplace=True)

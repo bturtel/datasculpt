@@ -1,6 +1,6 @@
 from typing import List, Dict, Any, Callable, Optional
-from .sculptor import Sculptor
-from .utils import load_config
+from sculptor.sculptor import Sculptor
+from sculptor.utils import load_config
 from helpers.data_sources import BaseDataSource
 
 class SculptorPipeline:
@@ -57,6 +57,13 @@ class SculptorPipeline:
             pipeline.add(sculptor, filter_fn)
             
         return pipeline
+
+    def get_schema_fields(self) -> Dict[str, Dict[str, Any]]:
+        """Gets a combined dictionary of all schema fields from all sculptors in the pipeline."""
+        schema_fields = {}
+        for sculptor, _ in self.steps:
+            schema_fields.update(sculptor.schema)
+        return schema_fields
 
     def process(
         self,

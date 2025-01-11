@@ -37,10 +37,10 @@ steps:
       schema:
         relevant_sample:
           type: boolean
-          description: "Does post describe personal experience using AI for mental health?"
+          description: "Boolean indicating if text describes personal experience using AI for the use case described in the prompt"
         relevant_sample_explanation:
           type: string
-          description: "Why the post was classified as relevant or not"
+          description: "Explanation of why the sample was classified as relevant or not relevant"
       instructions: >
         We are analyzing Reddit posts to understand how people are using AI and chatbots for mental health, coaching, or emotional support.
         Specifically, we want to identify posts where users share their personal experiences using AI tools for:
@@ -66,42 +66,42 @@ steps:
 
 
   - sculptor:
-      model: "meta-llama/Meta-Llama-3.1-405B-Instruct"
-      api_key: *deepinfra_key
-      base_url: *deepinfra_base
+      model: "gpt-4o"
+      api_key: *openai_key
+      base_url: *openai_base
       schema:
         sentiment:
           type: integer
-          description: "Sentiment towards AI for mental health (1-10, 10 most positive)"
+          description: "Integer 1-10 indicating sentiment TOWARDS using AI for mental health (10 most positive). This is NOT sentiment of the post overall, just sentiment towards the interaction with AI."
         benefits:
           type: array
           items: string
-          description: "Keywords for benefits: non_judgemental, affordable, accessible, etc"
+          description: "List of keywords relating to perceived benefits of using the AI, e.g.: non_judgemental, on_demand, affordable, accessible, anonymous, consistent, supportive, patient"
         downsides:
           type: array
           items: string
-          description: "Keywords for downsides: repetitive, shallow, unreliable, etc"
+          description: "List of keywords relating to downsides of using the AI, e.g.: repetitive, robotic, shallow, unreliable, addictive, avoidant, limited"
         use_cases:
           type: array
           items: string
-          description: "How AI is used: reflection, venting, CBT, journaling, etc"
+          description: "List of keywords relating to how AI is used, e.g.: reflection, venting, self_talk, planning, CBT, journaling, motivation, reminders, emotional_support"
         conditions:
           type: array
           items: string
-          description: "Conditions mentioned: ADHD, depression, anxiety, etc"
+          description: "List of keywords describing conditions being addressed, e.g.: ADHD, depression, anxiety, addiction, OCD, PTSD, bipolar, eating_disorder"
         seeing_provider:
           type: boolean
-          description: "Currently seeing a mental health provider (True or False)"
+          description: "Boolean indicating if subject indicates they are CURRENTLY seeing a therapist or mental health provider"
         previous_provider:
           type: boolean
-          description: "Has previously seen a mental health provider (True or False)"
+          description: "Boolean indicating if subject indicates they have EVER seen a therapist or mental health provider"
         provider_problems:
           type: array
           items: string
-          description: "Issues with human providers: expensive, unavailable, etc"
-        analysis_notes:
+          description: "List of keywords relating to perceived issues with HUMAN PROVIDERS, e.g.: expensive, unavailable, inaccessible, scheduling, inconsistent, judgmental"
+        fields_explanation:
           type: string
-          description: "Additional analysis and reasoning"
+          description: "Concise but thorough explanation of your reasoning for each field in the schema (except for relevant_sample and relevant_sample_explanation)"
       instructions: >
         We are analyzing Reddit posts to understand how people are using AI and chatbots for mental health, coaching, or emotional support.
         Specifically, we want to identify posts where users share their personal experiences using AI tools for:

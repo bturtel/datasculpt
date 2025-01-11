@@ -1,0 +1,52 @@
+vars:
+  openai_base: &openai_base "https://api.openai.com/v1"
+  openai_key: &openai_key "${OPENAI_API_KEY}"
+
+input:
+  - type: "hackernews"
+    config:
+      tags: ["show_hn"]
+      limit: 10000
+
+output:
+  path: "examples/output/launches.csv"
+
+steps:
+  - sculptor:
+      model: "gpt-4o-mini"
+      api_key: *openai_key
+      base_url: *openai_base
+      schema:
+        is_launch:
+          type: boolean
+          description: "Is this a product launch announcement?"
+      instructions: "Determine if this post announces a product launch."
+    filter: "lambda x: x['is_launch'] == True"
+
+  - sculptor:
+      model: "gpt-4o-mini"
+      api_key: *openai_key
+      base_url: *openai_base
+      schema:
+        product_name:
+          type: string
+          description: "Name of the product being launched"
+        category:
+          type: array
+          items: "enum"
+          enum: ["AI", "web3", "crypto", "blockchain", "creators", "NFT", "metaverse", 
+                  "VR", "quantum_computing", "edge", "IoT", "smart_home", "biotech", 
+                  "space_tech", "clean_tech", "robotics", "dev_tools", "cloud", "fintech", "other"]
+          description: "All categories that apply to this product (select multiple if relevant)"
+        target_users:
+          type: array
+          items: "enum"
+          enum: ["developers", "enterprises", "consumers", "creators", "researchers"]
+          description: "Target audience(s)"
+        pricing_tier:
+          type: integer
+          description: "Approximate monthly price tier in USD: 0=free, 1=$1-10, 2=$11-50, 3=$51-200, 4=$201+"
+        is_open_source:
+          type: boolean
+          description: "Is the product open source?"
+      instructions: "Extract key information about the product launch."
